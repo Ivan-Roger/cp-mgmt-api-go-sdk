@@ -1,9 +1,10 @@
 package Examples
 
 import (
-	api "../APIFiles"
 	"fmt"
 	"os"
+
+	api "../APIFiles"
 )
 
 func AddAccessRule() {
@@ -21,7 +22,7 @@ func AddAccessRule() {
 	fmt.Printf("Enter password: ")
 	fmt.Scanln(&password)
 
-	args := api.APIClientArgs(api.DefaultPort, "", "", apiServer, "", -1, "", false, false, "deb.txt", api.WebContext, api.TimeOut, api.SleepTime, "", "", -1)
+	args := api.APIClientArgs(api.DefaultPort, "", "", apiServer, "", -1, "", false, false, api.WebContext, api.TimeOut, api.SleepTime, "", "", -1)
 	client := api.APIClient(args)
 
 	fmt.Printf("Enter the name of the access rule: ")
@@ -43,8 +44,6 @@ func AddAccessRule() {
 		print("Login error.\n")
 		os.Exit(1)
 	}
-
-
 
 	if loginRes.Success == false {
 		print("Login failed:\n" + loginRes.ErrorMsg)

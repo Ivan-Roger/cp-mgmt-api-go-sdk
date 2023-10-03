@@ -1,9 +1,10 @@
 package Examples
 
 import (
-	api "../APIFiles"
 	"fmt"
 	"os"
+
+	api "../APIFiles"
 )
 
 func DupIp() {
@@ -20,7 +21,7 @@ func DupIp() {
 	var pass string
 	fmt.Scanln(&pass)
 
-	args := api.APIClientArgs(api.DefaultPort, "", "", apiServer, "", -1, "", false, false, "deb.txt", api.WebContext, api.TimeOut, api.SleepTime, "", "", -1)
+	args := api.APIClientArgs(api.DefaultPort, "", "", apiServer, "", -1, "", false, false, api.WebContext, api.TimeOut, api.SleepTime, "", "", -1)
 
 	client := api.APIClient(args)
 
@@ -53,7 +54,7 @@ func DupIp() {
 	//dupIpSlice - a collection of the duplicate IP addresses in all the host objects.
 	var dupIpSlice []string
 
-	for _, host := range showHostsRes.GetData(){
+	for _, host := range showHostsRes.GetData() {
 		ipaddr := host.(map[string]interface{})["ipv4-address"].(string)
 		if ipaddr == "" {
 			print(host.(map[string]interface{})["name"].(string) + " has no IPv4 address. Skipping...")
@@ -65,7 +66,7 @@ func DupIp() {
 		if _, ok := objDictionary[ipaddr]; ok {
 			ipExists := false
 			for _, ip := range dupIpSlice {
-				if ip == ipaddr{
+				if ip == ipaddr {
 					ipExists = true
 					break
 				}
@@ -91,12 +92,12 @@ func DupIp() {
 	}
 
 	//for every duplicate ip - print hosts with that ip:
-	for _, dupIp :=  range dupIpSlice {
+	for _, dupIp := range dupIpSlice {
 
 		fmt.Println("\nIP Address: " + dupIp + "")
 		fmt.Println("-------------------------------")
 
-		for _, hostData := range objDictionary[dupIp]{
+		for _, hostData := range objDictionary[dupIp] {
 
 			fmt.Println("host name: " + hostData["name"] + " host uid: " + hostData["uid"])
 			//fmt.Println(hostData[1])
@@ -104,6 +105,5 @@ func DupIp() {
 		}
 
 	}
-
 
 }

@@ -16,27 +16,25 @@ import (
 type Client struct {
 	client      *http.Client
 	server      string
-	sid         string
 	fingerprint string
-	debugLevel  string
 }
 
 // Init and returns new instance of HTTP client wrapper
-func CreateClient(server string, sid string, timeout time.Duration) (*Client, error) {
+func CreateClient(server string, sid string, timeout time.Duration) *Client {
 	//sgignore next_line
 	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	var netClient = &http.Client{
 		Timeout: timeout,
 	}
-	return &Client{netClient, server, sid, "", ""}, nil
+	return &Client{netClient, server, ""}
 }
 
 // Init and returns new instance of HTTP proxy client
-func CreateProxyClient(server string, serverProxy string, sid string, portProxy int, timeout time.Duration) (*Client, error) {
+func CreateProxyClient(server string, serverProxy string, sid string, portProxy int, timeout time.Duration) *Client {
 	proxyURL, _ := url.Parse("http://" + serverProxy + ":" + strconv.Itoa(portProxy))
 	http.DefaultTransport = &http.Transport{
-		Proxy:           http.ProxyURL(proxyURL),
-		TLSNextProto:    make(map[string]func(authority string, c *tls.Conn) http.RoundTripper),
+		Proxy:        http.ProxyURL(proxyURL),
+		TLSNextProto: make(map[string]func(authority string, c *tls.Conn) http.RoundTripper),
 		//sgignore next_line
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
@@ -44,12 +42,15 @@ func CreateProxyClient(server string, serverProxy string, sid string, portProxy 
 		Timeout: timeout,
 	}
 
-	return &Client{netClient, server, sid, "", ""}, nil
+	return &Client{netClient, server, ""}
 }
 
-// Set debug level for client
-func (c *Client) SetDebugLevel(level string) {
-	c.debugLevel = level
+// Init and returns new instance of HTTP proxy client
+func CreateClientWithTransport(transport http.RoundTripper, server string, sid string, timeout time.Duration) *Client {
+	return &Client{&http.Client{
+		Transport: transport,
+		Timeout:   timeout,
+	}, server, ""}
 }
 
 // Returns pointer to HTTP client

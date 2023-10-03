@@ -31,17 +31,17 @@ import (
 )
 
 const (
-	InProgress       string        = "in progress"
-	DefaultPort      int           = 443
-	Limit            int           = 50
-	Filename         string        = "fingerprints.json"
-	TimeOut          time.Duration = time.Second * 10
-	SleepTime        time.Duration = time.Second * 2
-	GaiaContext      string        = "gaia_api"
-	WebContext       string        = "web_api"
-	DefaultProxyPort               = -1
-	DefaultProxyHost               = ""
-	AutoPublishBatchSize  int      = 100
+	InProgress           string        = "in progress"
+	DefaultPort          int           = 443
+	Limit                int           = 50
+	Filename             string        = "fingerprints.json"
+	TimeOut              time.Duration = time.Second * 10
+	SleepTime            time.Duration = time.Second * 2
+	GaiaContext          string        = "gaia_api"
+	WebContext           string        = "web_api"
+	DefaultProxyPort                   = -1
+	DefaultProxyHost                   = ""
+	AutoPublishBatchSize int           = 100
 )
 
 // Check Point API Client (Management/GAIA)
@@ -58,20 +58,18 @@ type ApiClient struct {
 	apiVersion              string
 	ignoreServerCertificate bool
 	acceptServerCertificate bool
-	debugFile               string
-	httpDebugLevel          string
 	context                 string
-	timeout                 time.Duration
 	sleep                   time.Duration
 	userAgent               string
 	cloudMgmtId             string
 	autoPublishBatchSize    int
-	activeCallsLock		    sync.Mutex
-	autoPublishLock 		sync.Mutex
-	totalCallsLock 		    sync.Mutex
+	activeCallsLock         sync.Mutex
+	autoPublishLock         sync.Mutex
+	totalCallsLock          sync.Mutex
 	duringPublish           bool
-	activeCallsCtr 		    int
-	totalCallsCtr 		    int
+	activeCallsCtr          int
+	totalCallsCtr           int
+	client                  *Client
 }
 
 // Api Client constructor
@@ -108,6 +106,14 @@ func APIClient(apiCA ApiClientArgs) *ApiClient {
 		apiCA.UserAgent = "golang-api-wrapper"
 	}
 
+	if apiCA.Client == nil {
+		if proxyUsed {
+			apiCA.Client = CreateProxyClient(apiCA.Server, apiCA.ProxyHost, "", apiCA.ProxyPort, apiCA.Timeout)
+		} else {
+			apiCA.Client = CreateClient(apiCA.Server, "", apiCA.Timeout)
+		}
+	}
+
 	return &ApiClient{
 		port:                    apiCA.Port,
 		isPortDefault_:          isPortDefault,
@@ -121,15 +127,23 @@ func APIClient(apiCA ApiClientArgs) *ApiClient {
 		apiVersion:              apiCA.ApiVersion,
 		ignoreServerCertificate: apiCA.IgnoreServerCertificate,
 		acceptServerCertificate: apiCA.AcceptServerCertificate,
-		debugFile:               apiCA.DebugFile,
-		httpDebugLevel:          apiCA.HttpDebugLevel,
 		context:                 apiCA.Context,
 		autoPublishBatchSize:    apiCA.AutoPublishBatchSize,
-		timeout:                 apiCA.Timeout,
 		sleep:                   apiCA.Sleep,
 		userAgent:               apiCA.UserAgent,
 		cloudMgmtId:             apiCA.CloudMgmtId,
+		client:                  apiCA.Client,
 	}
+}
+
+// Returns the underlying http client
+func (c *ApiClient) GetClient() *Client {
+	return c.client
+}
+
+// Returns the underlying http client
+func (c *ApiClient) SetClient(client *Client) {
+	c.client = client
 }
 
 // Returns the port of API client
@@ -170,11 +184,6 @@ func (c *ApiClient) SetPort(portToSet int) {
 // Set API sleep time
 func (c *ApiClient) SetSleepTime(sleepTime time.Duration) {
 	c.sleep = sleepTime
-}
-
-// Set API client timeout
-func (c *ApiClient) SetTimeout(timeout time.Duration) {
-	c.timeout = timeout
 }
 
 // Returns session id
@@ -240,7 +249,6 @@ read_only: [optional] Login with Read Only permissions. This parameter is not co
 payload: [optional] More settings for the login command
 returns: APIResponse, error
 side-effects: updates the class's uid and server variables
-
 */
 func (c *ApiClient) ApiLogin(username string, password string, continueLastSession bool, domain string, readOnly bool, payload map[string]interface{}) (APIResponse, error) {
 	credentials := map[string]interface{}{
@@ -287,7 +295,7 @@ func (c *ApiClient) commonLoginLogic(credentials map[string]interface{}, continu
 		}
 	}
 
-	loginRes, errCall := c.apiCall("login", credentials, "", false, c.IsProxyUsed(), true)
+	loginRes, errCall := c.apiCall("login", credentials, "", false, true)
 	if errCall != nil {
 		return loginRes, errCall
 	}
@@ -309,24 +317,25 @@ command: the command is placed in the URL field
 payload: a JSON object (or a string representing a JSON object) with the command arguments
 sid: The Check Point session-id. when omitted use self.sid.
 waitForTask: determines the behavior when the API server responds with a "task-id".
+
 	by default, the function will periodically check the status of the task
 	and will not return until the task is completed.
 	when wait_for_task=False, it is up to the user to call the "show-task" API and check
 	the status of the command.
+
 useProxy: Determines if the user wants to use the proxy server and port provider.
 return: APIResponse object
 side-effects: updates the class's uid and server variables
-
 */
 func (c *ApiClient) ApiCall(command string, payload map[string]interface{}, sid string, waitForTask bool, useProxy bool) (APIResponse, error) {
-	return c.apiCall(command,payload,sid,waitForTask,useProxy,false)
+	return c.apiCall(command, payload, sid, waitForTask, false)
 }
 
 func (c *ApiClient) ApiCallSimple(command string, payload map[string]interface{}) (APIResponse, error) {
-	return c.apiCall(command, payload, c.sid,true, c.IsProxyUsed(),false)
+	return c.apiCall(command, payload, c.sid, true, false)
 }
 
-func (c *ApiClient) apiCall(command string, payload map[string]interface{}, sid string, waitForTask bool, useProxy bool, internal bool) (APIResponse, error) {
+func (c *ApiClient) apiCall(command string, payload map[string]interface{}, sid string, waitForTask bool, internal bool) (APIResponse, error) {
 	fp, errFP := getFingerprint(c.server, c.port)
 	if errFP != nil {
 		return APIResponse{}, errFP
@@ -350,23 +359,6 @@ func (c *ApiClient) apiCall(command string, payload map[string]interface{}, sid 
 		return APIResponse{}, err
 	}
 
-	if sid == "" {
-		sid = c.sid
-	}
-
-	var client *Client
-	if useProxy {
-		client, err = CreateProxyClient(c.server, c.proxyHost, sid, c.proxyPort, c.timeout)
-		if err != nil {
-			return APIResponse{}, err
-		}
-	} else {
-		client, err = CreateClient(c.server, sid, c.timeout)
-		if err != nil {
-			return APIResponse{}, err
-		}
-	}
-
 	url := "https://" + c.server + ":" + strconv.Itoa(c.port)
 
 	if c.cloudMgmtId != "" {
@@ -381,9 +373,7 @@ func (c *ApiClient) apiCall(command string, payload map[string]interface{}, sid 
 
 	url += "/" + command
 
-	client.fingerprint = c.fingerprint
-
-	client.SetDebugLevel(c.httpDebugLevel)
+	c.client.fingerprint = c.fingerprint
 
 	spotReader := bytes.NewReader(_data)
 
@@ -395,6 +385,10 @@ func (c *ApiClient) apiCall(command string, payload map[string]interface{}, sid 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("User-Agent", c.userAgent)
 
+	if sid == "" {
+		sid = c.sid
+	}
+
 	if command != "login" {
 		req.Header.Set("X-chkp-sid", sid)
 	}
@@ -402,9 +396,9 @@ func (c *ApiClient) apiCall(command string, payload map[string]interface{}, sid 
 	if !internal && c.autoPublishBatchSize > 0 {
 		waitToRun := true
 		for waitToRun {
-			if c.totalCallsCtr + 1 <= c.autoPublishBatchSize && !c.duringPublish {
+			if c.totalCallsCtr+1 <= c.autoPublishBatchSize && !c.duringPublish {
 				c.totalCallsLock.Lock()
-				if c.totalCallsCtr + 1 <= c.autoPublishBatchSize && !c.duringPublish {
+				if c.totalCallsCtr+1 <= c.autoPublishBatchSize && !c.duringPublish {
 					c.totalCallsCtr++
 					waitToRun = false
 				}
@@ -417,7 +411,7 @@ func (c *ApiClient) apiCall(command string, payload map[string]interface{}, sid 
 		c.increaseActiveCalls()
 	}
 
-	response, err := client.client.Do(req)
+	response, err := c.client.client.Do(req)
 
 	if err != nil {
 		if !internal && c.autoPublishBatchSize > 0 {
@@ -510,9 +504,9 @@ func (c *ApiClient) apiCall(command string, payload map[string]interface{}, sid 
 
 	if !internal && c.autoPublishBatchSize > 0 {
 		c.decreaseActiveCalls()
-		if c.totalCallsCtr > 0 && c.totalCallsCtr % c.autoPublishBatchSize == 0 && !c.duringPublish {
+		if c.totalCallsCtr > 0 && c.totalCallsCtr%c.autoPublishBatchSize == 0 && !c.duringPublish {
 			c.autoPublishLock.Lock()
-			if c.totalCallsCtr > 0 && c.totalCallsCtr % c.autoPublishBatchSize == 0 && !c.duringPublish {
+			if c.totalCallsCtr > 0 && c.totalCallsCtr%c.autoPublishBatchSize == 0 && !c.duringPublish {
 				c.duringPublish = true
 				c.autoPublishLock.Unlock()
 				for c.activeCallsCtr > 0 {
@@ -522,16 +516,16 @@ func (c *ApiClient) apiCall(command string, payload map[string]interface{}, sid 
 				}
 				// Going to publish
 				fmt.Println("Start auto publish...")
-				publishRes, _ := c.apiCall("publish", map[string]interface{}{},c.GetSessionID(),true,c.IsProxyUsed(), true)
+				publishRes, _ := c.apiCall("publish", map[string]interface{}{}, c.GetSessionID(), true, true)
 
 				if !publishRes.Success {
 					fmt.Println("Auto publish failed. Message: " + publishRes.ErrorMsg)
-				}else{
+				} else {
 					fmt.Println("Auto publish finished successfully")
 				}
 				c.totalCallsCtr = 0
 				c.duringPublish = false
-			}else{
+			} else {
 				c.autoPublishLock.Unlock()
 			}
 		}
@@ -540,7 +534,7 @@ func (c *ApiClient) apiCall(command string, payload map[string]interface{}, sid 
 	return res, nil
 }
 
-/**
+/*
 The APIs that return a list of objects are limited by the number of objects that they return.
 To get the full list of objects, there's a need to make repeated API calls each time using a different offset
 until all the objects are returned.
@@ -549,19 +543,25 @@ note: this function calls gen_api_query and iterates over the generator until it
 then returns.
 
 command: name of API command. This command should be an API that returns an array of
+
 	objects (for example: show-hosts, show networks, ...)
+
 details_level: query APIs always take a details-level argument.
+
 	possible values are "standard", "full", "uid"
+
 container_key: name of the key that holds the objects in the JSON response (usually "objects").
 include_container_key: If set to False the 'data' field of the APIResponse object
+
 	will be a list of the wanted objects. Otherwise, the date field of the APIResponse will be a dictionary in the following
+
 format: { container_key: [ List of the wanted objects], "total": size of the list}
 payload: a JSON object (or a string representing a JSON object) with the command arguments
 return: if include-container-key is False:
+
 	an APIResponse object whose .data member contains a list of the objects requested: [ , , , ...]
 	if include-container-key is True:
 	an APIResponse object whose .data member contains a dict: { container_key: [...], "total": n }
-
 */
 func (c *ApiClient) ApiQuery(command string, detailsLevel string, containerKey string, includeContainerKey bool, payload map[string]interface{}) (APIResponse, error) {
 
@@ -608,7 +608,9 @@ This is in contrast to normal API calls that return only a limited number of obj
 This function can be used to show progress when requesting many objects (i.e. "Received x/y objects.")
 
 command: name of API command. This command should be an API that returns an array of objects
+
 	(for example: show-hosts, show networks, ...)
+
 details_level: query APIs always take a details-level argument. Possible values are "standard", "full", "uid"
 container_keys: the field in the .data dict that contains the objects
 payload: a JSON object (or a string representing a JSON object) with the command arguments
@@ -636,7 +638,7 @@ func (c *ApiClient) genApiQuery(command string, detailsLevel string, containerKe
 	payload["limit"] = objLimit
 	payload["offset"] = iterations * objLimit
 	payload["details-level"] = detailsLevel
-	apiRes, err := c.apiCall(command, payload, c.sid, false, c.IsProxyUsed(), true)
+	apiRes, err := c.apiCall(command, payload, c.sid, false, true)
 
 	if err != nil {
 		print(err.Error())
@@ -690,7 +692,7 @@ func (c *ApiClient) genApiQuery(command string, detailsLevel string, containerKe
 		payload["limit"] = objLimit
 		payload["offset"] = iterations * objLimit
 		payload["details-level"] = detailsLevel
-		apiRes, err = c.apiCall(command, payload, c.sid, false, c.IsProxyUsed(), true)
+		apiRes, err = c.apiCall(command, payload, c.sid, false, true)
 
 		if err != nil {
 			print("Error communicating with server, please check your connection.")
@@ -703,7 +705,7 @@ func (c *ApiClient) genApiQuery(command string, detailsLevel string, containerKe
 	return serverResponse
 }
 
-/**
+/*
 When the server needs to perform an API call that may take a long time (e.g. run-script, install-policy,
 publish), the server responds with a 'task-id'.
 Using the show-task API it is possible to check on the status of this task until its completion.
@@ -722,7 +724,7 @@ func (c *ApiClient) waitForTask(taskId string) (APIResponse, error) {
 	payload := map[string]interface{}{"task-id": taskId, "details-level": "full"}
 
 	for !taskComplete {
-		taskResult, err = c.apiCall("show-task", payload, c.sid, false, c.IsProxyUsed(), true)
+		taskResult, err = c.apiCall("show-task", payload, c.sid, false, true)
 
 		if err != nil {
 			return APIResponse{}, err
@@ -734,7 +736,7 @@ func (c *ApiClient) waitForTask(taskId string) (APIResponse, error) {
 			if attemptsCounter < 5 {
 				attemptsCounter++
 				time.Sleep(c.sleep)
-				taskResult, err = c.apiCall("show-task", payload, c.sid, false, c.IsProxyUsed(), true)
+				taskResult, err = c.apiCall("show-task", payload, c.sid, false, true)
 
 				if err != nil {
 					return APIResponse{}, err
@@ -769,7 +771,7 @@ func (c *ApiClient) waitForTask(taskId string) (APIResponse, error) {
 
 }
 
-/**
+/*
 The version of waitForTask function for the collection of tasks
 
 task_objects: A list of task objects
@@ -788,7 +790,7 @@ func (c *ApiClient) waitForTasks(taskObjects []interface{}) APIResponse {
 		"task-id":       tasks,
 		"details-level": "full",
 	}
-	taskRes, err := c.apiCall("show-task", payload, c.GetSessionID(), false, c.IsProxyUsed(), true)
+	taskRes, err := c.apiCall("show-task", payload, c.GetSessionID(), false, true)
 
 	if err != nil {
 		fmt.Println("Problem showing tasks, try again")
@@ -814,21 +816,19 @@ func (c *ApiClient) waitForTasks(taskObjects []interface{}) APIResponse {
 
 }
 
-/**
+/*
 This method checks if one of the tasks failed and if so, changes the response status to be False
 
 task_result: api_response returned from "show-task" command
 return:
 */
 func checkTasksStatus(taskResult *APIResponse) {
-
 	for _, task := range taskResult.data["tasks"].([]interface{}) {
 		if task.(map[string]interface{})["status"] == "failed" || task.(map[string]interface{})["status"] == "partially succeeded" {
 			taskResult.setSuccessStatus(false)
 			break
 		}
 	}
-
 }
 
 /*
@@ -837,7 +837,7 @@ func checkTasksStatus(taskResult *APIResponse) {
    @===================@
 */
 
-/**
+/*
 This function checks if the server's certificate is stored in the local fingerprints file.
 If the server's fingerprint is not found, an HTTPS connection is made to the server
 and the user is asked if he or she accepts the server's fingerprint.
@@ -919,7 +919,7 @@ func (c *ApiClient) loadFingerprintFromFile() (string, error) {
 
 }
 
-/**
+/*
 This function takes the content of the file $FILENAME (which is a json file)
 and parses it's content to a map (from string to string)
 
@@ -951,13 +951,15 @@ func (c *ApiClient) fpFileToMap() (map[string]string, error) {
 
 }
 
-/**
+/*
 store a server's fingerprint into a local file.
 
 server: the IP address/name of the Check Point management server.
 fingerprint: A SHA1 fingerprint of the server's certificate.
 filename: The file in which to store the certificates. The file will hold a JSON structure in which
+
 	the key is the server and the value is its fingerprint.
+
 return: 'True' if everything went well. 'False' if there was some kind of error storing the fingerprint.
 */
 func (c *ApiClient) saveFingerprintToFile(server string, fingerprint string) error {
@@ -989,7 +991,7 @@ func (c *ApiClient) saveFingerprintToFile(server string, fingerprint string) err
 
 }
 
-/**
+/*
 Simply creates a new empty json file with the name $name
 
 return: error if happened
@@ -1013,9 +1015,11 @@ func (c *ApiClient) createEmptyJsonFile(name string) error {
 
 }
 
-/* @=========@
+/*
+   @=========@
    |  Utils  |
-   @=========@ */
+   @=========@
+*/
 
 func (c *ApiClient) askYesOrNoQuestion(question string) bool {
 	fmt.Println(question)

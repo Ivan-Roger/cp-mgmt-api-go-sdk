@@ -1,9 +1,10 @@
 package Examples
 
 import (
-	api "../APIFiles"
 	"fmt"
 	"os"
+
+	api "../APIFiles"
 )
 
 func DiscardSessions() {
@@ -21,7 +22,7 @@ func DiscardSessions() {
 	fmt.Printf("Enter password: ")
 	fmt.Scanln(&password)
 
-	args := api.APIClientArgs(api.DefaultPort, "", "", apiServer, "", -1, "", false, false, "deb.txt", api.WebContext, api.TimeOut, api.SleepTime, "", "", -1)
+	args := api.APIClientArgs(api.DefaultPort, "", "", apiServer, "", -1, "", false, false, api.WebContext, api.TimeOut, api.SleepTime, "", "", -1)
 
 	client := api.APIClient(args)
 
@@ -77,9 +78,9 @@ func DiscardSessions() {
 		discardRes, _ = client.ApiCall("discard", map[string]interface{}{"uid": sessionObj.(map[string]interface{})["uid"]}, "", false, false)
 
 		if discardRes.Success {
-			fmt.Println("Session " + sessionObj.(map[string]interface{})["uid"].(string)+ " discarded successfully")
+			fmt.Println("Session " + sessionObj.(map[string]interface{})["uid"].(string) + " discarded successfully")
 		} else {
-			fmt.Println("Session " + sessionObj.(map[string]interface{})["uid"].(string)+ " failed to discard")
+			fmt.Println("Session " + sessionObj.(map[string]interface{})["uid"].(string) + " failed to discard")
 		}
 	}
 

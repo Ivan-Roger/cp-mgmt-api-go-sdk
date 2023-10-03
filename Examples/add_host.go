@@ -1,9 +1,10 @@
 package Examples
 
 import (
-	api "../APIFiles"
 	"fmt"
 	"os"
+
+	api "../APIFiles"
 )
 
 func AddHost() {
@@ -20,7 +21,7 @@ func AddHost() {
 	fmt.Printf("Enter password: ")
 	fmt.Scanln(&password)
 
-	args := api.APIClientArgs(api.DefaultPort, "", "", apiServer, "", -1, "", false, false, "deb.txt", api.WebContext, api.TimeOut, api.SleepTime, "", "", -1)
+	args := api.APIClientArgs(api.DefaultPort, "", "", apiServer, "", -1, "", false, false, api.WebContext, api.TimeOut, api.SleepTime, "", "", -1)
 
 	client := api.APIClient(args)
 
@@ -29,7 +30,7 @@ func AddHost() {
 		os.Exit(1)
 	}
 
-	loginRes, err := client.Login(username, password,false, "", false, "")
+	loginRes, err := client.Login(username, password, false, "", false, "")
 	if err != nil {
 		print("Login error.\n")
 		os.Exit(1)

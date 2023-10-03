@@ -1,6 +1,8 @@
 package api_go_sdk
 
-import "time"
+import (
+	"time"
+)
 
 // Api Client arguments to init a new instance
 type ApiClientArgs struct {
@@ -8,19 +10,18 @@ type ApiClientArgs struct {
 	Fingerprint             string
 	Sid                     string
 	Server                  string
-	HttpDebugLevel          string
 	ProxyHost               string
 	ProxyPort               int
 	ApiVersion              string
 	IgnoreServerCertificate bool
 	AcceptServerCertificate bool
-	DebugFile               string
 	Context                 string
-	Timeout 				time.Duration
-	Sleep 				    time.Duration
-	UserAgent			    string
+	Timeout                 time.Duration
+	Sleep                   time.Duration
+	UserAgent               string
 	CloudMgmtId             string
-	AutoPublishBatchSize	int
+	AutoPublishBatchSize    int
+	Client                  *Client
 }
 
 /*
@@ -44,24 +45,22 @@ UserAgent: User agent will be use in api call request header
 CloudMgmtId: Smart-1 Cloud management UID
 AutoPublishBatchSize: Number of batch size for auto publish
 */
-func APIClientArgs(port int, fingerprint string, sid string, server string, proxyHost string, proxyPort int, apiVersion string, ignoreServerCertificate bool, acceptServerCertificate bool, debugFile string, context string, timeout time.Duration, sleep time.Duration, userAgent string, cloudMgmtId string, autoPublishBatchSize int) ApiClientArgs {
-
+func APIClientArgs(port int, fingerprint string, sid string, server string, proxyHost string, proxyPort int, apiVersion string, ignoreServerCertificate bool, acceptServerCertificate bool, context string, timeout time.Duration, sleep time.Duration, userAgent string, cloudMgmtId string, autoPublishBatchSize int) ApiClientArgs {
 	return ApiClientArgs{
-		Port: port,
-		Fingerprint: fingerprint,
-		Sid: sid,
-		Server: server,
-		ProxyHost: proxyHost,
-		ProxyPort: proxyPort,
-		ApiVersion: apiVersion,
+		Port:                    port,
+		Fingerprint:             fingerprint,
+		Sid:                     sid,
+		Server:                  server,
+		ProxyHost:               proxyHost,
+		ProxyPort:               proxyPort,
+		ApiVersion:              apiVersion,
 		IgnoreServerCertificate: ignoreServerCertificate,
 		AcceptServerCertificate: acceptServerCertificate,
-		DebugFile: debugFile,
-		Context: context,
-		Timeout: timeout,
-		Sleep: sleep,
-		UserAgent: userAgent,
-		CloudMgmtId: cloudMgmtId,
-		AutoPublishBatchSize: autoPublishBatchSize,
+		Context:                 context,
+		Timeout:                 timeout,
+		Sleep:                   sleep,
+		UserAgent:               userAgent,
+		CloudMgmtId:             cloudMgmtId,
+		AutoPublishBatchSize:    autoPublishBatchSize,
 	}
 }

@@ -1,9 +1,10 @@
 package Examples
 
 import (
-	api "../APIFiles"
 	"fmt"
 	"os"
+
+	api "../APIFiles"
 )
 
 func ShowHosts() {
@@ -21,10 +22,9 @@ func ShowHosts() {
 	fmt.Printf("Enter password: ")
 	fmt.Scanln(&password)
 
-	args := api.APIClientArgs(api.DefaultPort, "", "", apiServer, "", -1, "", false, false, "deb.txt", api.WebContext, api.TimeOut, api.SleepTime, "", "", -1)
+	args := api.APIClientArgs(api.DefaultPort, "", "", apiServer, "", -1, "", false, false, api.WebContext, api.TimeOut, api.SleepTime, "", "", -1)
 
 	client := api.APIClient(args)
-
 
 	if x, _ := client.CheckFingerprint(); !x {
 		print("Could not get the server's fingerprint - Check connectivity with the server.\n")
@@ -42,7 +42,7 @@ func ShowHosts() {
 		os.Exit(1)
 	}
 
-	showHostsRes,err2 := client.ApiQuery("show-hosts", "full", "objects", false, map[string]interface{}{})
+	showHostsRes, err2 := client.ApiQuery("show-hosts", "full", "objects", false, map[string]interface{}{})
 
 	if err2 != nil {
 		print("Failed to retrieve the hosts\n")
@@ -50,7 +50,7 @@ func ShowHosts() {
 	}
 
 	//fmt.Println(show_sessions_res.GetData())
-	for _,sessionObj := range showHostsRes.GetData(){
+	for _, sessionObj := range showHostsRes.GetData() {
 		fmt.Println("-------------\n--------------")
 		fmt.Println(sessionObj.(map[string]interface{})["name"].(string))
 		fmt.Println(sessionObj.(map[string]interface{})["ipv4-address"].(string))
