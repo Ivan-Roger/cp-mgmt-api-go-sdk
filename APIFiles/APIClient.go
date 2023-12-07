@@ -42,6 +42,7 @@ const (
 	DefaultProxyPort                   = -1
 	DefaultProxyHost                   = ""
 	AutoPublishBatchSize int           = 100
+	WaitForTaskRetries   int           = 5
 )
 
 // Check Point API Client (Management/GAIA)
@@ -724,28 +725,22 @@ func (c *ApiClient) waitForTask(taskId string) (APIResponse, error) {
 	payload := map[string]interface{}{"task-id": taskId, "details-level": "full"}
 
 	for !taskComplete {
-		taskResult, err = c.apiCall("show-task", payload, c.sid, false, true)
-
-		if err != nil {
-			return APIResponse{}, err
-		}
-
 		attemptsCounter := 0
-
-		for taskResult.Success == false {
-			if attemptsCounter < 5 {
-				attemptsCounter++
-				time.Sleep(c.sleep)
-				taskResult, err = c.apiCall("show-task", payload, c.sid, false, true)
-
-				if err != nil {
-					return APIResponse{}, err
-				}
-
-			} else {
-				fmt.Println("ERROR: Failed to handle asynchronous tasks as synchronous, tasks result is undefined ", taskResult)
+		for attemptsCounter == 0 || taskResult.Success == false {
+			if attemptsCounter >= WaitForTaskRetries {
+				return APIResponse{}, errors.New(fmt.Sprintf("Failed to handle asynchronous tasks as synchronous, maximum number of retries exceeded: %+v", taskResult))
 			}
 
+			if attemptsCounter > 0 {
+				time.Sleep(c.sleep)
+			}
+
+			attemptsCounter++
+			taskResult, err = c.apiCall("show-task", payload, c.sid, false, true)
+
+			if err != nil {
+				return APIResponse{}, err
+			}
 		}
 
 		completedTasks := 0
